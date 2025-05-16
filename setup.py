@@ -11,6 +11,8 @@ setup(
     author_email='thomasnascenzi@yahoo.com',
     include_package_data=True,
     install_requires=[
+        "wxPython",
+        "numpy"
     ],
     description='Nascenzi developed tool for playing bridge',
 )

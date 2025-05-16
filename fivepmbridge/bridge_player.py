@@ -90,7 +90,7 @@ class BridgeServerGUI(wx.Frame):
         self.client.disconnect()
         self.Destroy()
 
-if __name__ == "__main__":
+def join_bridge_game(host, port):
     app = wx.App(False)
-    BridgeServerGUI(host='192.168.100.147', port=2410)  # Replace with actual server IP
+    BridgeServerGUI(host, port)  # Replace with actual server IP
     app.MainLoop()
