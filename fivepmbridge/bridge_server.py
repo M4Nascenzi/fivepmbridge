@@ -1,6 +1,8 @@
 import socket
 import threading
 
+SERVER = 0
+
 class BridgeTable:
     def __init__(self, host='0.0.0.0', port=2410, max_clients=4):
         self.host = host
@@ -10,7 +12,7 @@ class BridgeTable:
         self.clients = []
         self.client_lock = threading.Lock()
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_to_name = {}
+        self.client_to_name = {SERVER: "server"}
 
     def start(self):
         self.server_socket.bind((self.host, self.port))
@@ -49,14 +51,13 @@ class BridgeTable:
                         break
                     text = msg.decode().strip()
                     print(text)
-                    if text == "!shutdown":
-                        if conn == self.admin_conn:
-                            self.broadcast(b"[SERVER] Server is shutting down by admin.\n", conn)
-                            self.shutdown()
-                            break
-                    if text.split()[0] == "!name":
-                        self.client_to_name[conn] = ' '.join(text.split()[1:])
-                    self.broadcast(msg, conn)
+                    if self.parse_for_admin_commands(text, conn): continue
+                    if self.parse_for_social_commands(text, conn): continue
+                    if self.parse_for_bridge_commands(text, conn): continue
+                    self.broadcast(text, conn)
+
+
+                    # self.broadcast(text, SERVER)
                 except (ConnectionResetError, ConnectionAbortedError):
                     break
         with self.client_lock:
@@ -70,9 +71,40 @@ class BridgeTable:
                     self.admin_conn = None
         print(f"[DISCONNECTED] {addr} disconnected.")
 
-    def broadcast(self, message, sender_conn):
+    def parse_for_admin_commands(self, text, conn):
+        if text == "!shutdown":
+            if conn == self.admin_conn:
+                self.broadcast("Server is shutting down by admin.\n", SERVER)
+                self.shutdown()
+            return True
+        return False
+    def parse_for_social_commands(self, text, conn):
+        try:
+            if text.split()[0] == "!name":
+                self.broadcast(text, conn)
+                self.client_to_name[conn] = ' '.join(text.split()[1:])
+                return True
+            elif text.split()[0] == "!me":
+                self.broadcast(text[0:2], conn, me=True)
+                return True
+        except:
+            pass
+    def parse_for_bridge_commands(self, text, conn):
+        if text[0] == "@":
+            if text == "@pass":
+                pass
+            elif len(text) == 3 and text[1] in ["1","2","3","4","5","6","7"] and text[2] in ['s', 'c', 'd', 'h', 'n']:
+                self.broadcast(f"{self.client_to_name[conn]} bids '{text[1:]}'", SERVER)
+            else:
+                self.broadcast(f"You ({self.client_to_name[conn]}) can't bid '{text[1:]}'", SERVER)
+            return True
+
+
+    def broadcast(self, text, sender_conn, me=False):
         name = self.client_to_name[sender_conn]
-        text = name + ": " + message.decode().strip()
+        text = name + ": " + text
+        if me:
+            text = name + text[3:]
         msg_to_send = text.encode()
         with self.client_lock:
             for client in self.clients:
