@@ -1,2 +1,2 @@
 from fivepmbridge.bridge_server import start_bridge_server
-from fivepmbridge.bridge_player import join_bridge_game
+from fivepmbridge.bridge_gui import join_bridge_game
