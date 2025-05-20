@@ -16,10 +16,18 @@ VALUE_STRINGS = {
     11: 'Q',
     12: 'K'
 }
+
+THIS_DIR = os.path.dirname(os.path.abspath(__file__))
+CARD_DIR = os.path.join(THIS_DIR, 'cards')
+
 for v in range(1, 10):
     VALUE_STRINGS[v] = str(v+1)
 
-def draw_card(value, suit_name, output_folder='cards'):
+def draw_card(value, suit_name, full=True):
+    if full:
+        fake_width = 200
+    else:
+        fake_width = 100
     width, height = 200, 300
     card_color = (255, 255, 255)
     if suit_name in ['HEARTS', 'DIAMONDS']:
@@ -28,7 +36,7 @@ def draw_card(value, suit_name, output_folder='cards'):
         text_color = (0, 0, 0)      # Black
 
     # Create blank white card image
-    img = Image.new('RGBA', (width, height), card_color)
+    img = Image.new('RGBA', (fake_width, height), card_color)
     draw = ImageDraw.Draw(img)
 
     # Load font
@@ -71,20 +79,27 @@ def draw_card(value, suit_name, output_folder='cards'):
     )
 
     # Create output folder if needed
-    os.makedirs(output_folder, exist_ok=True)
+    os.makedirs(CARD_DIR, exist_ok=True)
 
     # Save file, e.g. "1_of_spades.png"
-    filename = os.path.join(output_folder, f"{value}_of_{suit_name.lower()}.png")
+    if full:
+        filename = os.path.join(CARD_DIR, f"{value}_of_{suit_name.lower()}.png")
+    else:
+        filename = os.path.join(CARD_DIR, f"{value}_of_{suit_name.lower()}_covered.png")
     img.save(filename)
     print(f"Saved {filename}")
 
-def draw_card_back(output_path="cards/card_back.png"):
+def draw_card_back(full=True):
+    if full:
+        fake_width = 200
+    else:
+        fake_width = 100
     width, height = 200, 300
     background_color = (150, 0, 0)  # Deep red
     border_color = (255, 255, 255)  # White
     pattern_color = (220, 220, 220)  # Light gray
 
-    img = Image.new('RGB', (width, height), background_color)
+    img = Image.new('RGB', (fake_width, height), background_color)
     draw = ImageDraw.Draw(img)
 
     # Draw white border
@@ -104,11 +119,17 @@ def draw_card_back(output_path="cards/card_back.png"):
 
     # Save and resize
     img = img.resize((60, 90), Image.LANCZOS)
+    if full:
+        output_path = os.path.join(CARD_DIR, "card_back.png")
+    else:
+        output_path = os.path.join(CARD_DIR, "card_back_covered.png")
     img.save(output_path)
     print(f"Saved {output_path}")
 
 if __name__ == "__main__":
     for suit in ['CLUBS', 'DIAMONDS', 'HEARTS', 'SPADES']:
         for value in range(1, 14):
-            draw_card(value, suit)
-    draw_card_back()
+            draw_card(value, suit, full=True)
+            draw_card(value, suit, full=False)
+    draw_card_back(full=True)
+    draw_card_back(full=False)
