@@ -150,6 +150,7 @@ class BridgeTable:
                         if target_name == client_name:
                             self.client_to_dummy[client] = True
                             self.broadcast(f"Admin set {client_name} dummy flag to True.", SERVER)
+                            self.send_card_state()
                             break
                     return True
                 except:
