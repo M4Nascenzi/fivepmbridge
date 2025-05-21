@@ -32,9 +32,10 @@ class BridgeTable:
                     self.client_to_name[conn] = str(addr)
                     if self.admin_conn is None:
                         self.admin_conn = conn
-                        conn.sendall(b"[SERVER] You are the admin.")
+                        msg = "[SERVER] You are the admin."
                     else:
-                        conn.sendall(b"[SERVER] You are a regular player.")
+                        msg = "[SERVER] You are a regular player."
+                    self.send_message(conn, msg)
 
                 # with self.client_lock:
                 #     if len(self.clients) >= self.max_clients:
@@ -47,6 +48,11 @@ class BridgeTable:
         except:
             self.shutdown()
 
+    def send_message(self, client, message):
+        data = message.encode()
+        length = len(data).to_bytes(4, byteorder='big')  # 4-byte length prefix
+        client.sendall(length + data)
+
 
     def handle_client(self, conn, addr):
         print(f"[NEW CONNECTION] {addr} connected.")
@@ -54,11 +60,18 @@ class BridgeTable:
             self.send_card_state()
             while True:
                 try:
-                    msg = conn.recv(1024)
-                    if not msg:
-                        break
-                    text = msg.decode().strip()
-                    print(text)
+                    length_bytes = conn.recv(4)
+                    if not length_bytes:
+                        raise ConnectionError("Did not receive length_bytes")
+                    length = int.from_bytes(length_bytes, byteorder='big')
+                    data = b""
+                    while len(data) < length:
+                        more = conn.recv(length - len(data))
+                        if not more:
+                            raise ConnectionError("Socket closed")
+                        data += more
+
+                    text = data.decode()
                     if self.parse_for_admin_commands(text, conn): continue
                     if self.parse_for_social_commands(text, conn): continue
                     if self.parse_for_bridge_commands(text, conn): continue
@@ -66,7 +79,7 @@ class BridgeTable:
 
 
                     # self.broadcast(text, SERVER)
-                except (ConnectionResetError, ConnectionAbortedError):
+                except (ConnectionResetError, ConnectionAbortedError, ConnectionError):
                     break
         with self.client_lock:
             if conn in self.clients:
@@ -76,7 +89,8 @@ class BridgeTable:
                 if len(self.clients) > 0:
                     for client in self.clients:
                         try:
-                            self.client.sendall(b"[PRIVATE] You are now the admin!")
+                            msg = "[PRIVATE] You are now the admin!"
+                            self.send_message(client, msg)
                             self.admin_conn = client
                             break
                         except:
@@ -182,27 +196,26 @@ class BridgeTable:
 
     def broadcast(self, text, sender_conn, me=False):
         name = self.client_to_name[sender_conn]
-        text = name + ": " + text
+        msg_to_send = name + ": " + text
         if me:
-            text = name + text[3:]
-        msg_to_send = text.encode()
+            msg_to_send = name + text[3:]
         with self.client_lock:
             for client in self.clients:
                 try:
-                    client.sendall(msg_to_send)
+                    self.send_message(client, msg_to_send)
                 except Exception:
+                    print(f"COULD NOT SEND MESSAGE {msg_to_send}, {client}")
                     pass  # Ignore broken connections
 
     def scold(self, text, client):
         # name = self.client_to_name[client]
-        text = "^" + text
-        msg_to_send = text.encode()
+        msg_to_send = "^" + text
         with self.client_lock:
             # for client in self.clients:
             try:
-                client.sendall(msg_to_send)
+                self.send_message(client, msg_to_send)
             except Exception:
-                pass  # Ignore broken connections
+                print(f"COULD NOT SEND MESSAGE {msg_to_send}, {client}")
 
     def shutdown(self):
         print("[SHUTDOWN] Server is shutting down.")
@@ -249,9 +262,8 @@ class BridgeTable:
                         player_hand_states[cards_owner_name] = [a.to_code() for a in cards]
                     else:
                         player_hand_states[cards_owner_name] = ["b" for a in cards]
-                print("sending state")
                 state_text = "@" + self.client_to_name[client] + "\n" + str(player_hand_states) + "\n" + str(player_played_cards)
-                client.sendall(state_text.encode())
+                self.send_message(client, state_text)
         self.broadcast("Sent State", SERVER)
 
 def start_bridge_server():

@@ -244,7 +244,8 @@ class ContractBridge():
             if value is None:
                 four_cards = False
         if four_cards:
-            self.players_to_played_cards = {}
+            for i, player in enumerate(self.players_to_cards):
+                self.players_to_played_cards[player] = None
             return True
         return False
 

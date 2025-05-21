@@ -22,18 +22,26 @@ class BridgeClient:
 
     def receive_messages(self):
         while self.running:
-            # try:
-            msg = self.socket.recv(4096)
-            if not msg:
+            try:
+                length_bytes = self.socket.recv(4)
+                if not length_bytes:
+                    raise RuntimeError("Did not receive length_bytes")
+                length = int.from_bytes(length_bytes, byteorder='big')
+                data = b""
+                while len(data) < length:
+                    more = self.socket.recv(length - len(data))
+                    if not more:
+                        raise EOFError("Socket closed")
+                    data += more
+
+                text = data.decode()
+                if self.parse_commands(text):
+                    pass
+                else:
+                    self.gui.append_message(text)
+            except Exception as e:
+                self.gui.append_message(f"Error receiving message: {e}")
                 break
-            text = msg.decode()
-            if self.parse_commands(text):
-                pass
-            else:
-                self.gui.append_message(text)
-            # except Exception as e:
-            #     self.gui.append_message(f"Error receiving message: {e}")
-            #     break
         self.running = False
         self.socket.close()
         self.gui.append_message("Disconnected from server.")
@@ -66,13 +74,6 @@ class BridgeClient:
         wx.CallAfter(self.gui.update_state, names_ordered, hands_ordered, played_cards_ordered)
         # self.gui.update_state(names_ordered, hands_ordered, played_cards_ordered)
 
-    def send_message(self, message):
-        if self.running:
-            try:
-                self.socket.sendall(message.encode())
-            except Exception as e:
-                self.gui.append_message(f"Error sending message: {e}")
-
     def play_card(self, card):
         self.send_message("@card_"+card)
 
@@ -88,5 +89,8 @@ class BridgeClient:
         self.socket.close()
         self.gui.append_message("Disconnected.")
 
-
+    def send_message(self, message):
+        data = message.encode()
+        length = len(data).to_bytes(4, byteorder='big')  # 4-byte length prefix
+        self.socket.sendall(length + data)
 
